@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task Schedule Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="favicon.ico" />
+<link rel="icon" type="image/png" sizes="100x100" href="favicon100-2.png" />
+<link rel="icon" type="image/png" sizes="150x150" href="favicon150-2.png" />
+<link rel="apple-touch-icon" href="favicon150-2.png" />
+<meta name="theme-color" content="#1A1612" />
+<meta name="description" content="TSM — Task Schedule Management. A lightweight task and schedule manager." />
+</head>
+<body>
+
+<!-- ══════════════════════ SIDEBAR ══════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-icon">▣</span>
+    <span class="brand-text">TSM</span>
+  </div>
+
+  <nav class="sidebar-nav">
+    <button class="nav-btn active" data-view="dashboard" onclick="switchView('dashboard',this)">
+      <span class="nav-icon">⊞</span><span class="nav-label">Dashboard</span>
+    </button>
+    <button class="nav-btn" data-view="tasks" onclick="switchView('tasks',this)">
+      <span class="nav-icon">◈</span><span class="nav-label">Tasks</span>
+    </button>
+    <button class="nav-btn" data-view="calendar" onclick="switchView('calendar',this)">
+      <span class="nav-icon">▦</span><span class="nav-label">Calendar</span>
+    </button>
+    <button class="nav-btn" data-view="schedule" onclick="switchView('schedule',this)">
+      <span class="nav-icon">≡</span><span class="nav-label">Schedule</span>
+    </button>
+    <button class="nav-btn" data-view="reminders" onclick="switchView('reminders',this)">
+      <span class="nav-icon">◎</span><span class="nav-label">Reminders</span>
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-chip">
+      <span class="user-avatar" id="user-avatar-display">U</span>
+      <span class="user-name"  id="user-name-display">User</span>
+    </div>
+    <button class="settings-btn" id="notif-btn"
+            onclick="initNotifications()" title="Enable notifications">🔔</button>
+    <button class="settings-btn" onclick="openSettings()" title="Settings">⚙</button>
+  </div>
+</aside>
+
+<!-- ══════════════════════ MOBILE TOP BAR ══════════════════════ -->
+<header class="topbar">
+  <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+  <span class="topbar-title">TSM</span>
+  <button class="add-btn-top" onclick="openAddTask()">＋</button>
+</header>
+
+<!-- ══════════════════════ MAIN CONTENT ══════════════════════ -->
+<main class="main" id="main">
+
+  <!-- ─── DASHBOARD ─── -->
+  <section class="view active" id="view-dashboard">
+    <div class="view-header">
+      <h1 class="view-title">Dashboard</h1>
+      <button class="btn-primary" onclick="openAddTask()">＋ New Task</button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Total Tasks</span>
+        <span class="stat-value" id="stat-total">0</span>
+      </div>
+      <div class="stat-card stat-green">
+        <span class="stat-label">Completed</span>
+        <span class="stat-value" id="stat-done">0</span>
+      </div>
+      <div class="stat-card stat-amber">
+        <span class="stat-label">In Progress</span>
+        <span class="stat-value" id="stat-progress">0</span>
+      </div>
+      <div class="stat-card stat-red">
+        <span class="stat-label">Overdue</span>
+        <span class="stat-value" id="stat-overdue">0</span>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="card-header">
+          <h2 class="card-title">Upcoming Tasks</h2>
+          <span class="card-badge" id="upcoming-count">0</span>
+        </div>
+        <ul class="task-list" id="upcoming-list"></ul>
+      </div>
+      <div class="dash-card">
+        <div class="card-header">
+          <h2 class="card-title">Today's Schedule</h2>
+          <span class="today-date" id="today-label"></span>
+        </div>
+        <ul class="schedule-list" id="today-schedule"></ul>
+      </div>
+    </div>
+
+    <div class="dash-card full-card">
+      <div class="card-header">
+        <h2 class="card-title">Progress Overview</h2>
+      </div>
+      <div class="progress-bars" id="progress-bars"></div>
+    </div>
+  </section>
+
+  <!-- ─── TASKS ─── -->
+  <section class="view" id="view-tasks">
+    <div class="view-header">
+      <h1 class="view-title">Tasks</h1>
+      <div class="header-actions">
+        <select class="filter-select" id="filter-status" onchange="renderTasks()">
+          <option value="all">All Status</option>
+          <option value="todo">To Do</option>
+          <option value="progress">In Progress</option>
+          <option value="done">Done</option>
+        </select>
+        <select class="filter-select" id="filter-priority" onchange="renderTasks()">
+          <option value="all">All Priority</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <button class="btn-primary" onclick="openAddTask()">＋ New Task</button>
+      </div>
+    </div>
+    <div class="tasks-container" id="tasks-container"></div>
+  </section>
+
+  <!-- ─── CALENDAR ─── -->
+  <section class="view" id="view-calendar">
+    <div class="view-header">
+      <h1 class="view-title">Calendar</h1>
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="changeMonth(-1)">◀</button>
+        <span class="cal-month-label" id="cal-month-label"></span>
+        <button class="cal-nav-btn" onclick="changeMonth(1)">▶</button>
+      </div>
+    </div>
+    <div class="calendar-wrap">
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+    <div class="cal-events-panel">
+      <div class="card-header">
+        <h2 class="card-title" id="cal-selected-label">Select a date</h2>
+      </div>
+      <ul class="task-list" id="cal-events-list">
+        <li class="empty-msg">Click a date to view tasks</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ─── SCHEDULE ─── -->
+  <section class="view" id="view-schedule">
+    <div class="view-header">
+      <h1 class="view-title">Schedule</h1>
+      <button class="btn-primary" onclick="openAddTask()">＋ Add Entry</button>
+    </div>
+    <div class="schedule-week" id="schedule-week"></div>
+  </section>
+
+  <!-- ─── REMINDERS ─── -->
+  <section class="view" id="view-reminders">
+    <div class="view-header">
+      <h1 class="view-title">Reminders</h1>
+      <div class="header-actions">
+        <button class="btn-ghost" id="notif-enable-btn" onclick="initNotifications()">🔔 Enable Notifications</button>
+        <button class="btn-primary" onclick="openAddTask()">＋ New Task</button>
+      </div>
+    </div>
+
+    <!-- Notification status bar -->
+    <div class="notif-status-bar" id="notif-status-bar"></div>
+
+    <!-- Upcoming + Overdue grid -->
+    <div class="reminders-grid">
+      <div class="dash-card">
+        <div class="card-header">
+          <h2 class="card-title">Upcoming Reminders</h2>
+          <span class="card-badge" id="reminder-count">0</span>
+        </div>
+        <ul class="reminder-list" id="reminder-list">
+          <li class="empty-msg">No upcoming reminders</li>
+        </ul>
+      </div>
+      <div class="dash-card">
+        <div class="card-header">
+          <h2 class="card-title">Overdue</h2>
+          <span class="card-badge" id="overdue-reminder-count">0</span>
+        </div>
+        <ul class="reminder-list" id="overdue-reminder-list">
+          <li class="empty-msg">No overdue tasks 🎉</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- All reminders -->
+    <div class="dash-card full-card" style="margin-top:1rem">
+      <div class="card-header">
+        <h2 class="card-title">All Reminders</h2>
+      </div>
+      <ul class="reminder-list" id="all-reminder-list">
+        <li class="empty-msg">No reminders set</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<!-- ══════════════════════ TASK MODAL ══════════════════════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">New Task</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id" />
+
+      <div class="form-group">
+        <label class="form-label">Task Name *</label>
+        <input type="text" class="form-input" id="task-name"
+               placeholder="What needs to be done?" autocomplete="off" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Due Date</label>
+          <input type="date" class="form-input" id="task-date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Time</label>
+          <input type="time" class="form-input" id="task-time" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Priority</label>
+          <select class="form-input" id="task-priority">
+            <option value="low">🟢 Low</option>
+            <option value="medium" selected>🟡 Medium</option>
+            <option value="high">🔴 High</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-input" id="task-status">
+            <option value="todo">To Do</option>
+            <option value="progress">In Progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-input" id="task-category">
+          <option value="work">Work</option>
+          <option value="personal">Personal</option>
+          <option value="health">Health</option>
+          <option value="errands">Errands</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">🔔 Reminder</label>
+        <select class="form-input" id="task-reminder">
+          <option value="none">No reminder</option>
+          <option value="0">At task time</option>
+          <option value="5">5 minutes before</option>
+          <option value="15" selected>15 minutes before</option>
+          <option value="30">30 minutes before</option>
+          <option value="60">1 hour before</option>
+          <option value="120">2 hours before</option>
+          <option value="1440">1 day before</option>
+          <option value="2880">2 days before</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-input form-textarea" id="task-notes"
+                  placeholder="Add any notes..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveTask()">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ SETTINGS MODAL ══════════════════════ -->
+<div class="settings-overlay" id="settings-overlay" onclick="closeSettingsModal(event)">
+  <div class="settings-modal">
+
+    <div class="modal-header">
+      <h2 class="modal-title">Settings</h2>
+      <button class="modal-close" onclick="closeSettingsModal()">✕</button>
+    </div>
+
+    <!-- Profile -->
+    <div class="settings-section">
+      <div class="settings-section-title">Profile</div>
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input type="text" class="form-input" id="settings-name"
+               placeholder="Your name" maxlength="40" autocomplete="off" />
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="settings-section">
+      <div class="settings-section-title">Notifications</div>
+
+      <div class="notif-perm-row">
+        <div>
+          <div class="setting-label">Browser Notifications</div>
+          <div class="setting-sub">Required for all reminders to fire</div>
+        </div>
+        <span class="perm-badge perm-default" id="settings-notif-perm">Checking…</span>
+      </div>
+
+      <div style="margin-top:0.75rem">
+        <button class="btn-ghost" style="width:100%" onclick="initNotifications()">
+          🔔 Request / Check Permission
+        </button>
+      </div>
+    </div>
+
+    <!-- Reminder defaults -->
+    <div class="settings-section">
+      <div class="settings-section-title">Reminder Defaults</div>
+
+      <div class="form-group">
+        <label class="form-label">Default Reminder Offset</label>
+        <select class="form-input" id="settings-default-reminder">
+          <option value="none">No reminder</option>
+          <option value="0">At task time</option>
+          <option value="5">5 minutes before</option>
+          <option value="15">15 minutes before</option>
+          <option value="30">30 minutes before</option>
+          <option value="60">1 hour before</option>
+          <option value="120">2 hours before</option>
+          <option value="1440">1 day before</option>
+          <option value="2880">2 days before</option>
+        </select>
+      </div>
+
+      <div class="setting-row" style="margin-top:0.75rem">
+        <div>
+          <div class="setting-label">Daily Morning Digest</div>
+          <div class="setting-sub">Summary notification of today's tasks</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="settings-daily-digest" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="digest-time-row" style="margin-top:0.5rem">
+        <label class="form-label" for="settings-digest-time">Digest time</label>
+        <input type="time" class="form-input" id="settings-digest-time" value="08:00" />
+      </div>
+    </div>
+
+    <!-- Data -->
+    <div class="settings-section">
+      <div class="settings-section-title">Data</div>
+      <div class="settings-actions">
+        <button class="btn-ghost" onclick="exportTasks()">⬇ Export Tasks (JSON)</button>
+        <button class="btn-danger" onclick="clearAllTasksConfirm()">✕ Delete All Tasks</button>
+      </div>
+    </div>
+
+    <div class="settings-actions-footer">
+      <button class="btn-ghost" onclick="closeSettingsModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveSettingsUI()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ TOAST ══════════════════════ -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

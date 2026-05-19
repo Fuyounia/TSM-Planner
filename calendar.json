@@ -1,0 +1,191 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "Container",
+      "bleed": true,
+      "style": "emphasis",
+      "items": [
+        {
+          "type": "ColumnSet",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "▣ TSM Calendar",
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "color": "Accent"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${month}",
+                  "size": "Small",
+                  "isSubtle": true,
+                  "spacing": "None"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ColumnSet",
+      "columns": [
+        { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "Su", "size": "ExtraSmall", "isSubtle": true, "horizontalAlignment": "Center" }] },
+        { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "Mo", "size": "ExtraSmall", "isSubtle": true, "horizontalAlignment": "Center" }] },
+        { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "Tu", "size": "ExtraSmall", "isSubtle": true, "horizontalAlignment": "Center" }] },
+        { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "We", "size": "ExtraSmall", "isSubtle": true, "horizontalAlignment": "Center" }] },
+        { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "Th", "size": "ExtraSmall", "isSubtle": true, "horizontalAlignment": "Center" }] },
+        { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "Fr", "size": "ExtraSmall", "isSubtle": true, "horizontalAlignment": "Center" }] },
+        { "type": "Column", "width": "stretch", "items": [{ "type": "TextBlock", "text": "Sa", "size": "ExtraSmall", "isSubtle": true, "horizontalAlignment": "Center" }] }
+      ]
+    },
+    {
+      "type": "Container",
+      "$data": "${weeks}",
+      "items": [
+        {
+          "type": "ColumnSet",
+          "spacing": "None",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${days[0].num}",
+                  "size": "ExtraSmall",
+                  "horizontalAlignment": "Center",
+                  "color": "${days[0].isToday ? 'Accent' : days[0].hasTasks ? 'Warning' : 'Default'}",
+                  "weight": "${days[0].isToday ? 'Bolder' : 'Default'}",
+                  "isSubtle": "${days[0].empty || days[0].done}"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${days[1].num}",
+                  "size": "ExtraSmall",
+                  "horizontalAlignment": "Center",
+                  "color": "${days[1].isToday ? 'Accent' : days[1].hasTasks ? 'Warning' : 'Default'}",
+                  "weight": "${days[1].isToday ? 'Bolder' : 'Default'}",
+                  "isSubtle": "${days[1].empty || days[1].done}"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${days[2].num}",
+                  "size": "ExtraSmall",
+                  "horizontalAlignment": "Center",
+                  "color": "${days[2].isToday ? 'Accent' : days[2].hasTasks ? 'Warning' : 'Default'}",
+                  "weight": "${days[2].isToday ? 'Bolder' : 'Default'}",
+                  "isSubtle": "${days[2].empty || days[2].done}"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${days[3].num}",
+                  "size": "ExtraSmall",
+                  "horizontalAlignment": "Center",
+                  "color": "${days[3].isToday ? 'Accent' : days[3].hasTasks ? 'Warning' : 'Default'}",
+                  "weight": "${days[3].isToday ? 'Bolder' : 'Default'}",
+                  "isSubtle": "${days[3].empty || days[3].done}"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${days[4].num}",
+                  "size": "ExtraSmall",
+                  "horizontalAlignment": "Center",
+                  "color": "${days[4].isToday ? 'Accent' : days[4].hasTasks ? 'Warning' : 'Default'}",
+                  "weight": "${days[4].isToday ? 'Bolder' : 'Default'}",
+                  "isSubtle": "${days[4].empty || days[4].done}"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${days[5].num}",
+                  "size": "ExtraSmall",
+                  "horizontalAlignment": "Center",
+                  "color": "${days[5].isToday ? 'Accent' : days[5].hasTasks ? 'Warning' : 'Default'}",
+                  "weight": "${days[5].isToday ? 'Bolder' : 'Default'}",
+                  "isSubtle": "${days[5].empty || days[5].done}"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${days[6].num}",
+                  "size": "ExtraSmall",
+                  "horizontalAlignment": "Center",
+                  "color": "${days[6].isToday ? 'Accent' : days[6].hasTasks ? 'Warning' : 'Default'}",
+                  "weight": "${days[6].isToday ? 'Bolder' : 'Default'}",
+                  "isSubtle": "${days[6].empty || days[6].done}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "spacing": "Small",
+      "style": "emphasis",
+      "$data": "${upcoming}",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "${date} — ${name}",
+          "size": "ExtraSmall",
+          "isSubtle": true,
+          "wrap": true,
+          "spacing": "None"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "Open Calendar",
+      "url": "./?view=calendar"
+    }
+  ]
+}

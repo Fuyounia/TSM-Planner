@@ -1,0 +1,92 @@
+{
+  "name": "TSM — Task Schedule Management",
+  "short_name": "TSM",
+  "description": "A lightweight task and schedule manager with reminders, Google sync, and home screen widgets.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F0E8",
+  "theme_color": "#1A1612",
+  "lang": "en-US",
+  "categories": ["productivity", "utilities"],
+
+  "icons": [
+    { "src": "./favicon.ico",        "sizes": "any",     "type": "image/x-icon" },
+    { "src": "./favicon100-2.png",   "sizes": "100x100", "type": "image/png", "purpose": "any" },
+    { "src": "./favicon150-2.png",   "sizes": "150x150", "type": "image/png", "purpose": "maskable" }
+  ],
+
+  "screenshots": [
+    {
+      "src": "./favicon150-2.png",
+      "sizes": "150x150",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "TSM Dashboard"
+    }
+  ],
+
+  "shortcuts": [
+    {
+      "name": "Add New Task",
+      "short_name": "Add Task",
+      "description": "Quickly add a new task",
+      "url": "./?action=new-task",
+      "icons": [{ "src": "./favicon100-2.png", "sizes": "100x100", "type": "image/png" }]
+    },
+    {
+      "name": "Today's Schedule",
+      "short_name": "Today",
+      "description": "View today's schedule and tasks",
+      "url": "./?view=schedule",
+      "icons": [{ "src": "./favicon100-2.png", "sizes": "100x100", "type": "image/png" }]
+    },
+    {
+      "name": "Task Widget",
+      "short_name": "Tasks",
+      "description": "Compact task list widget",
+      "url": "./widget-tasks.html",
+      "icons": [{ "src": "./favicon100-2.png", "sizes": "100x100", "type": "image/png" }]
+    },
+    {
+      "name": "Calendar Widget",
+      "short_name": "Calendar",
+      "description": "Compact calendar widget",
+      "url": "./widget-calendar.html",
+      "icons": [{ "src": "./favicon100-2.png", "sizes": "100x100", "type": "image/png" }]
+    }
+  ],
+
+  "widgets": [
+    {
+      "name": "TSM Tasks",
+      "short_name": "Tasks",
+      "description": "Today's tasks at a glance",
+      "tag": "tasks-widget",
+      "ms_ac_template": "widget/ac/tasks.json",
+      "data": "widget/data/tasks.json",
+      "type": "application/json",
+      "icons": [{ "src": "./favicon150-2.png", "sizes": "150x150", "type": "image/png" }],
+      "screenshots": [],
+      "backgrounds": [],
+      "update": 1800
+    },
+    {
+      "name": "TSM Calendar",
+      "short_name": "Calendar",
+      "description": "Monthly calendar with task dots",
+      "tag": "calendar-widget",
+      "ms_ac_template": "widget/ac/calendar.json",
+      "data": "widget/data/calendar.json",
+      "type": "application/json",
+      "icons": [{ "src": "./favicon150-2.png", "sizes": "150x150", "type": "image/png" }],
+      "screenshots": [],
+      "backgrounds": [],
+      "update": 3600
+    }
+  ],
+
+  "related_applications": [],
+  "prefer_related_applications": false
+}

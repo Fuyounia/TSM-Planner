@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>TSM — Tasks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="icon" href="favicon.ico"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --cream:#F5F0E8;--ink:#1A1612;--ink-muted:#6E6860;
+  --accent:#C84B2F;--accent-soft:#F0D4CC;
+  --amber:#D4860A;--amber-soft:#F5E4C0;
+  --green:#2D6E3E;--green-soft:#C8E4CE;
+  --cream-dark:#EDE8DE;
+}
+html,body{height:100%;background:var(--cream);color:var(--ink);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;}
+body{display:flex;flex-direction:column;min-height:100vh;}
+
+.widget-header{
+  background:var(--ink);color:var(--cream);
+  padding:14px 16px 10px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:10;
+}
+.widget-brand{display:flex;align-items:center;gap:8px;}
+.widget-brand-icon{font-size:1.2rem;color:var(--accent);}
+.widget-brand-text{font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;letter-spacing:.1em;}
+.widget-date{font-family:'DM Mono',monospace;font-size:.68rem;color:rgba(245,240,232,.55);}
+.header-right{display:flex;align-items:center;gap:8px;}
+.header-open-btn{
+  background:var(--accent);border:none;color:var(--cream);
+  font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:700;
+  padding:4px 10px;border-radius:3px;cursor:pointer;
+  letter-spacing:.04em;
+}
+
+.widget-body{flex:1;overflow-y:auto;padding:12px;}
+
+/* Loading */
+.loading{display:flex;align-items:center;justify-content:center;padding:3rem;color:var(--ink-muted);font-size:.82rem;}
+
+/* Auth prompt */
+.auth-prompt{
+  background:#fff;border:2px solid var(--ink);border-radius:4px;
+  padding:1.5rem;text-align:center;margin-top:1rem;
+  box-shadow:4px 4px 0 var(--ink);
+}
+.auth-prompt p{font-size:.85rem;color:var(--ink-muted);margin-bottom:1rem;}
+.btn-google-sm{
+  display:inline-flex;align-items:center;gap:8px;
+  background:#fff;border:1.5px solid var(--ink);
+  font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.5rem 1rem;border-radius:3px;cursor:pointer;
+  box-shadow:2px 2px 0 var(--ink);text-decoration:none;color:var(--ink);
+}
+
+/* Section labels */
+.section-label{
+  font-family:'Syne',sans-serif;font-size:.65rem;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--ink-muted);
+  margin:12px 0 6px;padding-bottom:4px;border-bottom:1.5px solid var(--cream-dark);
+}
+
+/* Task items */
+.task-row{
+  display:flex;align-items:flex-start;gap:9px;
+  padding:9px 10px;margin-bottom:5px;
+  background:#fff;border:1.5px solid var(--cream-dark);border-radius:3px;
+  cursor:pointer;transition:all .12s;
+}
+.task-row:hover{border-color:var(--ink);}
+.task-row.overdue{border-left:3px solid var(--accent);background:#FFF8F6;}
+
+.task-check{
+  width:16px;height:16px;border:1.5px solid var(--ink-muted);border-radius:2px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.6rem;flex-shrink:0;margin-top:1px;
+  background:#fff;
+}
+.task-check.done-check{background:var(--green);border-color:var(--green);color:#fff;}
+
+.task-text{flex:1;min-width:0;}
+.task-name{font-size:.85rem;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.task-name.done-name{text-decoration:line-through;color:var(--ink-muted);}
+.task-sub{display:flex;align-items:center;gap:5px;margin-top:2px;}
+.task-time{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--ink-muted);}
+.task-time.late{color:var(--accent);font-weight:700;}
+
+.p-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.p-dot.high{background:var(--accent);}
+.p-dot.medium{background:var(--amber);}
+.p-dot.low{background:var(--green);}
+
+.cat-tag{
+  font-size:.58rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  padding:1px 5px;border-radius:2px;border:1px solid;
+}
+.cat-work{background:#E8EEFA;border-color:#8FAADC;color:#1A3A6E;}
+.cat-personal{background:#F5E4FA;border-color:#C89EDC;color:#5A1A7E;}
+.cat-health{background:var(--green-soft);border-color:var(--green);color:var(--green);}
+.cat-errands{background:var(--amber-soft);border-color:var(--amber);color:#7A4E00;}
+.cat-other{background:var(--cream-dark);border-color:var(--ink-muted);color:var(--ink-muted);}
+
+/* Stats bar */
+.stats-row{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;
+}
+.stat-mini{
+  background:#fff;border:1.5px solid var(--ink);border-radius:3px;
+  padding:8px;text-align:center;box-shadow:2px 2px 0 var(--ink);
+}
+.stat-mini-val{font-family:'DM Mono',monospace;font-size:1.3rem;font-weight:500;color:var(--ink);display:block;}
+.stat-mini-lbl{font-size:.6rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);}
+
+.empty-msg{font-size:.78rem;color:var(--ink-muted);text-align:center;padding:1.5rem;font-style:italic;}
+
+/* Bottom bar */
+.widget-footer{
+  background:var(--cream-dark);border-top:1.5px solid var(--ink);
+  padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
+}
+.add-btn{
+  background:var(--accent);border:1.5px solid var(--accent);color:var(--cream);
+  font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;
+  padding:6px 14px;border-radius:3px;cursor:pointer;
+  box-shadow:2px 2px 0 var(--ink);text-decoration:none;
+}
+.sync-label{font-size:.65rem;color:var(--ink-muted);font-family:'DM Mono',monospace;}
+</style>
+</head>
+<body>
+
+<div class="widget-header">
+  <div class="widget-brand">
+    <span class="widget-brand-icon">▣</span>
+    <div>
+      <div class="widget-brand-text">TSM</div>
+      <div class="widget-date" id="w-date"></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="header-open-btn" onclick="window.open('./', '_blank')">Open App ↗</button>
+  </div>
+</div>
+
+<div class="widget-body" id="widget-body">
+  <div class="loading">Loading tasks…</div>
+</div>
+
+<div class="widget-footer">
+  <a href="./?action=new-task" class="add-btn" target="_blank">＋ New Task</a>
+  <span class="sync-label" id="sync-label">Syncing…</span>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="./firebase-config.js"></script>
+<script>
+const FIREBASE_READY = typeof FIREBASE_CONFIG !== 'undefined' && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
+
+// ── Date display ────────────────────────────────────────────
+const now = new Date();
+document.getElementById('w-date').textContent =
+  now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+function fmtTime(str) {
+  if (!str) return '';
+  let [h, m] = str.split(':').map(Number);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2,'0')} ${ap}`;
+}
+
+function isOverdue(t) {
+  if (t.status === 'done') return false;
+  if (!t.date) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return new Date(t.date + 'T00:00:00') < today;
+}
+
+function fmtDate(str) {
+  if (!str) return '';
+  const [y,m,d] = str.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[+m-1]} ${+d}`;
+}
+
+function renderTasks(tasks) {
+  const todayStr = now.toISOString().split('T')[0];
+  const body = document.getElementById('widget-body');
+
+  const done    = tasks.filter(t => t.status === 'done').length;
+  const overdue = tasks.filter(isOverdue).length;
+  const upcoming = tasks.filter(t => t.status !== 'done' && t.date && t.date >= todayStr).length;
+
+  let html = `
+    <div class="stats-row">
+      <div class="stat-mini">
+        <span class="stat-mini-val">${tasks.length}</span>
+        <span class="stat-mini-lbl">Total</span>
+      </div>
+      <div class="stat-mini">
+        <span class="stat-mini-val">${done}</span>
+        <span class="stat-mini-lbl">Done</span>
+      </div>
+      <div class="stat-mini" style="${overdue ? 'background:var(--accent-soft)' : ''}">
+        <span class="stat-mini-val" style="${overdue ? 'color:var(--accent)' : ''}">${overdue}</span>
+        <span class="stat-mini-lbl">Overdue</span>
+      </div>
+    </div>`;
+
+  // Overdue
+  const overdueList = tasks.filter(isOverdue).sort((a,b) => a.date < b.date ? 1 : -1);
+  if (overdueList.length) {
+    html += `<div class="section-label">⚠ Overdue</div>`;
+    overdueList.slice(0,4).forEach(t => { html += taskRowHTML(t, true); });
+  }
+
+  // Today
+  const todayList = tasks
+    .filter(t => t.date === todayStr)
+    .sort((a,b) => (a.time||'99:99') < (b.time||'99:99') ? -1 : 1);
+  html += `<div class="section-label">Today</div>`;
+  if (todayList.length) {
+    todayList.forEach(t => { html += taskRowHTML(t); });
+  } else {
+    html += `<div class="empty-msg">Nothing today — enjoy!</div>`;
+  }
+
+  // Upcoming (next 3 days excluding today)
+  const upcomingList = tasks
+    .filter(t => t.status !== 'done' && t.date && t.date > todayStr)
+    .sort((a,b) => (a.date+(a.time||'')) < (b.date+(b.time||'')) ? -1 : 1)
+    .slice(0, 5);
+  if (upcomingList.length) {
+    html += `<div class="section-label">Upcoming</div>`;
+    upcomingList.forEach(t => { html += taskRowHTML(t); });
+  }
+
+  body.innerHTML = html;
+  document.getElementById('sync-label').textContent = 'Synced ' + new Date().toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+}
+
+function taskRowHTML(t, forceOverdue = false) {
+  const over    = forceOverdue || isOverdue(t);
+  const checked = t.status === 'done';
+  const dateLabel = t.date && t.date !== now.toISOString().split('T')[0]
+    ? `${fmtDate(t.date)}${t.time ? ' · ' + fmtTime(t.time) : ''}`
+    : (t.time ? fmtTime(t.time) : '');
+
+  return `
+    <div class="task-row ${over ? 'overdue' : ''}" onclick="window.open('./?taskId=${t.id}','_blank')">
+      <span class="task-check ${checked ? 'done-check' : ''}">${checked ? '✓' : ''}</span>
+      <div class="task-text">
+        <div class="task-name ${checked ? 'done-name' : ''}">${escHtml(t.name)}</div>
+        <div class="task-sub">
+          <span class="p-dot ${t.priority}"></span>
+          ${dateLabel ? `<span class="task-time ${over?'late':''}">${dateLabel}${over?' ⚠':''}</span>` : ''}
+          <span class="cat-tag cat-${t.category}">${t.category}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showAuthPrompt() {
+  document.getElementById('widget-body').innerHTML = `
+    <div class="auth-prompt">
+      <p>Sign in to see your tasks across all devices.</p>
+      <a href="./" class="btn-google-sm" target="_blank">
+        <svg width="16" height="16" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 6.294C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
+        Sign in with Google
+      </a>
+    </div>`;
+  document.getElementById('sync-label').textContent = 'Not signed in';
+}
+
+// ── Bootstrap ───────────────────────────────────────────────
+if (FIREBASE_READY) {
+  const app  = firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+  db.enablePersistence().catch(() => {});
+
+  auth.onAuthStateChanged(user => {
+    if (!user) { showAuthPrompt(); return; }
+    db.collection('users').doc(user.uid).collection('tasks')
+      .onSnapshot(snap => {
+        const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderTasks(tasks);
+      }, () => {
+        document.getElementById('sync-label').textContent = 'Offline';
+      });
+  });
+} else {
+  // LocalStorage fallback
+  const tasks = JSON.parse(localStorage.getItem('tsm-tasks') || '[]');
+  renderTasks(tasks);
+  document.getElementById('sync-label').textContent = 'Local mode';
+}
+</script>
+</body>
+</html>

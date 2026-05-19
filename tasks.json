@@ -1,0 +1,129 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "Container",
+      "bleed": true,
+      "style": "emphasis",
+      "items": [
+        {
+          "type": "ColumnSet",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "▣ TSM",
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "color": "Accent"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${date}",
+                  "size": "Small",
+                  "isSubtle": true,
+                  "spacing": "None"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "auto",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${total} tasks",
+                  "size": "Small",
+                  "isSubtle": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "$data": "${tasks}",
+      "items": [
+        {
+          "type": "ColumnSet",
+          "spacing": "Small",
+          "separator": true,
+          "columns": [
+            {
+              "type": "Column",
+              "width": "auto",
+              "verticalContentAlignment": "Center",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${done ? '✓' : '○'}",
+                  "color": "${done ? 'Good' : 'Default'}",
+                  "size": "Small"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${name}",
+                  "wrap": true,
+                  "size": "Small",
+                  "weight": "${done ? 'Default' : 'Bolder'}",
+                  "color": "${priority == 'high' ? 'Attention' : priority == 'medium' ? 'Warning' : 'Good'}",
+                  "$when": "${!done}"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${name}",
+                  "wrap": true,
+                  "size": "Small",
+                  "isSubtle": true,
+                  "strikethrough": true,
+                  "$when": "${done}"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${time}",
+                  "size": "ExtraSmall",
+                  "isSubtle": true,
+                  "spacing": "None",
+                  "$when": "${time != ''}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "No tasks for today",
+      "isSubtle": true,
+      "horizontalAlignment": "Center",
+      "spacing": "Large",
+      "$when": "${count(tasks) == 0}"
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "Open TSM",
+      "url": "./"
+    },
+    {
+      "type": "Action.OpenUrl",
+      "title": "+ Add Task",
+      "url": "./?action=new-task"
+    }
+  ]
+}

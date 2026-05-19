@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>TSM — Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="icon" href="favicon.ico"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --cream:#F5F0E8;--ink:#1A1612;--ink-muted:#6E6860;
+  --accent:#C84B2F;--accent-soft:#F0D4CC;
+  --amber:#D4860A;--amber-soft:#F5E4C0;
+  --green:#2D6E3E;--green-soft:#C8E4CE;
+  --cream-dark:#EDE8DE;
+}
+html,body{height:100%;background:var(--cream);color:var(--ink);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;}
+body{display:flex;flex-direction:column;min-height:100vh;}
+
+.widget-header{
+  background:var(--ink);color:var(--cream);
+  padding:14px 16px 10px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:10;
+}
+.widget-brand{display:flex;align-items:center;gap:8px;}
+.widget-brand-icon{font-size:1.2rem;color:var(--accent);}
+.widget-brand-text{font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;letter-spacing:.1em;}
+.widget-month{font-family:'DM Mono',monospace;font-size:.68rem;color:rgba(245,240,232,.55);}
+.header-open-btn{
+  background:var(--accent);border:none;color:var(--cream);
+  font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:700;
+  padding:4px 10px;border-radius:3px;cursor:pointer;letter-spacing:.04em;
+}
+
+.widget-body{flex:1;overflow-y:auto;padding:12px 10px;}
+
+/* Calendar grid */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.cal-nav-btn{
+  background:transparent;border:1.5px solid var(--ink);color:var(--ink);
+  width:28px;height:28px;border-radius:3px;font-size:.75rem;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.cal-nav-btn:hover{background:var(--ink);color:var(--cream);}
+.cal-month-label{font-family:'Syne',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.06em;}
+
+.cal-grid{
+  background:#fff;border:2px solid var(--ink);border-radius:3px;
+  box-shadow:3px 3px 0 var(--ink);overflow:hidden;
+}
+.cal-day-headers{
+  display:grid;grid-template-columns:repeat(7,1fr);
+  background:var(--cream-dark);border-bottom:1.5px solid var(--ink);
+}
+.cal-day-hdr{
+  padding:5px 0;text-align:center;
+  font-size:.58rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-muted);
+}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);}
+.cal-day{
+  border:0.5px solid var(--cream-dark);
+  padding:4px;min-height:44px;cursor:pointer;
+  transition:background .1s;
+}
+.cal-day:hover{background:var(--cream-dark);}
+.cal-day.empty{cursor:default;background:var(--cream);}
+.cal-day.today{background:var(--ink);}
+.cal-day.today .cal-day-num{color:var(--cream);}
+.cal-day.selected{background:var(--accent-soft);border-color:var(--accent);}
+.cal-day-num{font-size:.72rem;font-weight:700;color:var(--ink);display:block;margin-bottom:2px;}
+.cal-dots{display:flex;flex-wrap:wrap;gap:2px;}
+.cal-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);}
+.cal-dot.amber{background:var(--amber);}
+.cal-dot.green{background:var(--green);}
+.cal-dot.done{background:var(--ink-muted);}
+
+/* Selected day tasks */
+.day-tasks-panel{
+  background:#fff;border:2px solid var(--ink);border-radius:3px;
+  box-shadow:3px 3px 0 var(--ink);padding:10px 12px;margin-top:10px;
+}
+.day-tasks-label{
+  font-family:'Syne',sans-serif;font-size:.72rem;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);
+  margin-bottom:8px;padding-bottom:5px;border-bottom:1.5px solid var(--cream-dark);
+}
+.day-task{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 0;border-bottom:1px solid var(--cream-dark);
+}
+.day-task:last-child{border:none;}
+.p-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.p-dot.high{background:var(--accent);}
+.p-dot.medium{background:var(--amber);}
+.p-dot.low{background:var(--green);}
+.day-task-name{font-size:.82rem;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.day-task-time{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--ink-muted);flex-shrink:0;}
+
+.empty-msg{font-size:.75rem;color:var(--ink-muted);text-align:center;padding:1rem;font-style:italic;}
+.loading{display:flex;align-items:center;justify-content:center;padding:2rem;color:var(--ink-muted);font-size:.82rem;}
+
+/* Auth prompt */
+.auth-prompt{
+  background:#fff;border:2px solid var(--ink);border-radius:3px;
+  padding:1.5rem;text-align:center;margin-top:1rem;box-shadow:3px 3px 0 var(--ink);
+}
+.auth-prompt p{font-size:.85rem;color:var(--ink-muted);margin-bottom:1rem;}
+.btn-google-sm{
+  display:inline-flex;align-items:center;gap:8px;
+  background:#fff;border:1.5px solid var(--ink);
+  font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:600;
+  padding:.5rem 1rem;border-radius:3px;cursor:pointer;
+  box-shadow:2px 2px 0 var(--ink);text-decoration:none;color:var(--ink);
+}
+
+.widget-footer{
+  background:var(--cream-dark);border-top:1.5px solid var(--ink);
+  padding:8px 12px;display:flex;align-items:center;justify-content:space-between;
+}
+.add-btn{
+  background:var(--accent);border:1.5px solid var(--accent);color:var(--cream);
+  font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:700;
+  padding:5px 12px;border-radius:3px;cursor:pointer;
+  box-shadow:2px 2px 0 var(--ink);text-decoration:none;
+}
+.sync-label{font-size:.62rem;color:var(--ink-muted);font-family:'DM Mono',monospace;}
+</style>
+</head>
+<body>
+
+<div class="widget-header">
+  <div class="widget-brand">
+    <span class="widget-brand-icon">▦</span>
+    <div>
+      <div class="widget-brand-text">TSM</div>
+      <div class="widget-month" id="w-month"></div>
+    </div>
+  </div>
+  <button class="header-open-btn" onclick="window.open('./?view=calendar','_blank')">Open ↗</button>
+</div>
+
+<div class="widget-body">
+  <div class="cal-nav">
+    <button class="cal-nav-btn" onclick="changeMonth(-1)">◀</button>
+    <span class="cal-month-label" id="cal-month-lbl"></span>
+    <button class="cal-nav-btn" onclick="changeMonth(1)">▶</button>
+  </div>
+  <div class="cal-grid">
+    <div class="cal-day-headers" id="cal-hdrs"></div>
+    <div class="cal-days" id="cal-days"></div>
+  </div>
+  <div class="day-tasks-panel" id="day-tasks-panel">
+    <div class="day-tasks-label" id="day-tasks-label">Select a date</div>
+    <div id="day-tasks-list"><div class="empty-msg">Click a day to see tasks</div></div>
+  </div>
+</div>
+
+<div class="widget-footer">
+  <a href="./?action=new-task" class="add-btn" target="_blank">＋ New Task</a>
+  <span class="sync-label" id="sync-label">Loading…</span>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="./firebase-config.js"></script>
+<script>
+const FIREBASE_READY = typeof FIREBASE_CONFIG !== 'undefined' && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
+
+let allTasks = [];
+let calYear  = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let selDate  = null;
+
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+document.getElementById('w-month').textContent = MONTHS[calMonth] + ' ' + calYear;
+
+// ── Calendar render ─────────────────────────────────────────
+function renderCalendar() {
+  const monthLbl = document.getElementById('cal-month-lbl');
+  monthLbl.textContent = MONTHS[calMonth] + ' ' + calYear;
+  document.getElementById('w-month').textContent = MONTHS[calMonth] + ' ' + calYear;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const dim      = new Date(calYear, calMonth + 1, 0).getDate();
+  const days     = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  document.getElementById('cal-hdrs').innerHTML =
+    days.map(d => `<div class="cal-day-hdr">${d}</div>`).join('');
+
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
+
+  for (let day = 1; day <= dim; day++) {
+    const ds  = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dt  = allTasks.filter(t => t.date === ds);
+    const dots = dt.slice(0,4).map(t => {
+      const c = t.status==='done' ? 'done' : t.priority==='high' ? '' : t.priority==='medium' ? 'amber' : 'green';
+      return `<span class="cal-dot ${c}"></span>`;
+    }).join('');
+    html += `
+      <div class="cal-day ${ds===todayStr?'today':''} ${selDate===ds?'selected':''}" onclick="selectDate('${ds}')">
+        <span class="cal-day-num">${day}</span>
+        <div class="cal-dots">${dots}</div>
+      </div>`;
+  }
+  document.getElementById('cal-days').innerHTML = html;
+}
+
+function selectDate(ds) {
+  selDate = ds;
+  renderCalendar();
+  const dt = allTasks.filter(t => t.date === ds)
+    .sort((a,b) => (a.time||'99:99') < (b.time||'99:99') ? -1 : 1);
+  const [y,m,d] = ds.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('day-tasks-label').textContent = `${months[+m-1]} ${+d}, ${y}`;
+  document.getElementById('day-tasks-list').innerHTML = dt.length
+    ? dt.map(t => `
+        <div class="day-task" onclick="window.open('./','_blank')">
+          <span class="p-dot ${t.priority}"></span>
+          <span class="day-task-name">${escHtml(t.name)}</span>
+          ${t.time ? `<span class="day-task-time">${fmtTime(t.time)}</span>` : ''}
+        </div>`).join('')
+    : `<div class="empty-msg">No tasks</div>`;
+}
+
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  selDate = null;
+  renderCalendar();
+  document.getElementById('day-tasks-label').textContent = 'Select a date';
+  document.getElementById('day-tasks-list').innerHTML = '<div class="empty-msg">Click a day to see tasks</div>';
+}
+
+function fmtTime(str) {
+  if (!str) return '';
+  let [h,m] = str.split(':').map(Number);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2,'0')} ${ap}`;
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function boot(tasks) {
+  allTasks = tasks;
+  renderCalendar();
+  document.getElementById('sync-label').textContent = 'Updated ' + new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+
+function showAuthPrompt() {
+  document.getElementById('day-tasks-list').innerHTML = `
+    <div class="auth-prompt">
+      <p>Sign in to sync your calendar.</p>
+      <a href="./" class="btn-google-sm" target="_blank">
+        <svg width="16" height="16" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 6.294C4.672 4.166 6.656 3.58 9 3.58z"/></svg>
+        Sign in
+      </a>
+    </div>`;
+  document.getElementById('sync-label').textContent = 'Not signed in';
+}
+
+if (FIREBASE_READY) {
+  const app  = firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+  db.enablePersistence().catch(() => {});
+
+  auth.onAuthStateChanged(user => {
+    if (!user) { renderCalendar(); showAuthPrompt(); return; }
+    db.collection('users').doc(user.uid).collection('tasks').onSnapshot(snap => {
+      boot(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  });
+} else {
+  boot(JSON.parse(localStorage.getItem('tsm-tasks') || '[]'));
+  document.getElementById('sync-label').textContent = 'Local mode';
+}
+</script>
+</body>
+</html>
