@@ -13,19 +13,19 @@
    8. Deploy Cloud Functions (see functions/README.md)
    ============================================================ */
 
-const firebaseConfig = {
-  apiKey: "AIzaSyA8Uit9CjWUGPkc-reEDndxuClg6dowzl8",
-  authDomain: "tsm-planner.firebaseapp.com",
-  projectId: "tsm-planner",
-  storageBucket: "tsm-planner.firebasestorage.app",
-  messagingSenderId: "585712753497",
-  appId: "1:585712753497:web:1773882934b93390a10a48",
-  measurementId: "G-Q8W8HVX6BH"
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID",
+  measurementId:     "YOUR_MEASUREMENT_ID",   // optional
 };
 
 // Web Push VAPID public key
 // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates → Key pair
-const VAPID_KEY = "BKQYZa3PNwp6DejJlM6-tRz78yWi43LQkCFA-VAtNau97FBJP0zNVVttG9uomQqZ8o6D3MdU6k5ew4LjOuROU-g";
+const VAPID_KEY = "YOUR_VAPID_KEY";
 
 /* ── Firestore Security Rules (paste into Firebase Console) ──
 
