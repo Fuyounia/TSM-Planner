@@ -1,7 +1,28 @@
 /* ============================================================
-   Task Schedule Management — app.js  v2.0
-   Full notification system · User settings · Reminders view
+   TSM — app.js  v3.0
+   Full Firebase Google Auth · Firestore Sync · Notifications
    ============================================================ */
+
+// ───────────────────────────────────────────────────────────
+// FIREBASE INIT
+// ───────────────────────────────────────────────────────────
+let fbAuth = null;
+let fbDb   = null;
+let currentUser = null;
+let firestoreUnsub = null; // unsubscribe fn for onSnapshot
+
+(function initFirebase() {
+  if (typeof firebase === 'undefined' || typeof firebaseConfig === 'undefined') return;
+  try {
+    firebase.initializeApp(firebaseConfig);
+    fbAuth = firebase.auth();
+    fbDb   = firebase.firestore();
+    fbDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    fbAuth.onAuthStateChanged(handleAuthStateChange);
+  } catch (e) {
+    console.warn('Firebase init failed:', e);
+  }
+})();
 
 // ───────────────────────────────────────────────────────────
 // SETTINGS STATE
@@ -20,23 +41,33 @@ function saveSettings() {
 }
 
 function applySettings() {
-  const nameEl = document.getElementById('user-name-display');
-  if (nameEl) nameEl.textContent = settings.userName;
-  const avatarEl = document.getElementById('user-avatar-display');
-  if (avatarEl) avatarEl.textContent = (settings.userName || 'U')[0].toUpperCase();
+  // Only use settings name when NOT signed in (Google name takes over when signed in)
+  if (!currentUser) {
+    const nameEl = document.getElementById('user-name-display');
+    if (nameEl) nameEl.textContent = settings.userName;
+    const avatarEl = document.getElementById('user-avatar-display');
+    if (avatarEl) {
+      avatarEl.textContent = (settings.userName || 'U')[0].toUpperCase();
+      avatarEl.style.backgroundImage = '';
+    }
+  }
 }
 
 // ───────────────────────────────────────────────────────────
 // STATE
 // ───────────────────────────────────────────────────────────
-let tasks = JSON.parse(localStorage.getItem('tsm-tasks') || '[]');
+let tasks = [];
 let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth();
 let selectedCalDate = null;
 let editingId = null;
 
-// Seed sample data on first load
-if (tasks.length === 0) {
+function getLocalTasks() {
+  return JSON.parse(localStorage.getItem('tsm-tasks') || '[]');
+}
+
+function seedSampleData() {
+  if (tasks.length > 0) return;
   const fmt = d => d.toISOString().split('T')[0];
   const add = n => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
   tasks = [
@@ -55,9 +86,232 @@ if (tasks.length === 0) {
 }
 
 // ───────────────────────────────────────────────────────────
+// AUTH HANDLERS
+// ───────────────────────────────────────────────────────────
+async function handleAuthStateChange(user) {
+  currentUser = user;
+
+  // Detach old Firestore listener
+  if (firestoreUnsub) {
+    firestoreUnsub();
+    firestoreUnsub = null;
+  }
+
+  if (user) {
+    // ── Signed in ──
+    updateAuthUI(user);
+    setSyncStatus('connecting');
+
+    // Attach real-time Firestore listener
+    firestoreUnsub = fbDb
+      .collection('users').doc(user.uid).collection('tasks')
+      .onSnapshot(
+        snap => {
+          tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          refreshCurrentView();
+          scheduleAllNotifications();
+          setSyncStatus('synced');
+          updateSyncLabel();
+        },
+        err => {
+          console.warn('Firestore error:', err);
+          setSyncStatus('offline');
+        }
+      );
+
+    // Check if there are local tasks to offer migration
+    const localTasks = getLocalTasks();
+    const migrateBtn = document.getElementById('migrate-btn');
+    if (migrateBtn && localTasks.length > 0) {
+      migrateBtn.style.display = '';
+      migrateBtn.textContent = `⬆ Import ${localTasks.length} local task${localTasks.length !== 1 ? 's' : ''}`;
+    }
+
+  } else {
+    // ── Signed out ──
+    updateAuthUI(null);
+    tasks = getLocalTasks();
+    if (tasks.length === 0) seedSampleData();
+    refreshCurrentView();
+    scheduleAllNotifications();
+    setSyncStatus('local');
+  }
+}
+
+function updateAuthUI(user) {
+  const signinDiv  = document.getElementById('sidebar-signin');
+  const footerDiv  = document.getElementById('sidebar-footer');
+  const nameEl     = document.getElementById('user-name-display');
+  const avatarEl   = document.getElementById('user-avatar-display');
+
+  // Settings modal panels
+  const signedOut  = document.getElementById('settings-auth-signedout');
+  const signedIn   = document.getElementById('settings-auth-signedin');
+
+  if (user) {
+    // Sidebar
+    if (signinDiv) signinDiv.style.display = 'none';
+    if (footerDiv) footerDiv.style.display = 'flex';
+    if (nameEl)    nameEl.textContent = user.displayName ? user.displayName.split(' ')[0] : 'You';
+    if (avatarEl) {
+      if (user.photoURL) {
+        avatarEl.style.backgroundImage = `url('${user.photoURL}')`;
+        avatarEl.style.backgroundSize  = 'cover';
+        avatarEl.textContent = '';
+      } else {
+        avatarEl.style.backgroundImage = '';
+        avatarEl.textContent = (user.displayName || 'U')[0].toUpperCase();
+      }
+    }
+
+    // Settings modal
+    if (signedOut) signedOut.style.display = 'none';
+    if (signedIn)  signedIn.style.display = 'block';
+    const photoEl = document.getElementById('settings-auth-photo');
+    const nameAuth = document.getElementById('settings-auth-name');
+    const emailAuth = document.getElementById('settings-auth-email');
+    if (photoEl)    { photoEl.src = user.photoURL || ''; photoEl.style.display = user.photoURL ? '' : 'none'; }
+    if (nameAuth)   nameAuth.textContent = user.displayName || '—';
+    if (emailAuth)  emailAuth.textContent = user.email || '—';
+
+  } else {
+    // Sidebar
+    if (signinDiv) signinDiv.style.display = 'flex';
+    if (footerDiv) footerDiv.style.display = 'flex';
+    if (nameEl)    nameEl.textContent = settings.userName || 'Local';
+    if (avatarEl) {
+      avatarEl.style.backgroundImage = '';
+      avatarEl.textContent = (settings.userName || 'U')[0].toUpperCase();
+    }
+
+    // Settings modal
+    if (signedOut) signedOut.style.display = 'block';
+    if (signedIn)  signedIn.style.display = 'none';
+  }
+}
+
+// ── Google sign-in ──────────────────────────────────────────
+async function signInWithGoogle() {
+  if (!fbAuth) { showToast('Firebase not available'); return; }
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('profile');
+    provider.addScope('email');
+    await fbAuth.signInWithPopup(provider);
+    showToast('Signed in ✓');
+  } catch (err) {
+    if (err.code !== 'auth/popup-closed-by-user') {
+      showToast('Sign-in failed: ' + (err.message || err.code));
+      console.error('Sign-in error:', err);
+    }
+  }
+}
+
+// ── Sign out ────────────────────────────────────────────────
+async function signOutUser() {
+  if (!fbAuth) return;
+  try {
+    await fbAuth.signOut();
+    // Reload tasks from localStorage after sign-out
+    tasks = getLocalTasks();
+    if (tasks.length === 0) seedSampleData();
+    refreshCurrentView();
+    document.getElementById('settings-overlay').classList.remove('open');
+    showToast('Signed out');
+  } catch (err) {
+    showToast('Sign-out failed');
+  }
+}
+
+// ── Migrate localStorage → Firestore ───────────────────────
+async function migrateLocalToFirestore() {
+  if (!currentUser || !fbDb) return;
+  const localTasks = getLocalTasks();
+  if (!localTasks.length) { showToast('No local tasks to import'); return; }
+
+  const btn = document.getElementById('migrate-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
+
+  try {
+    const col = fbDb.collection('users').doc(currentUser.uid).collection('tasks');
+    const batch = fbDb.batch();
+    localTasks.forEach(t => batch.set(col.doc(t.id), t));
+    await batch.commit();
+    localStorage.removeItem('tsm-tasks');
+    if (btn) btn.style.display = 'none';
+    showToast(`${localTasks.length} tasks imported ✓`);
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = '⬆ Import local tasks'; }
+    showToast('Import failed — try again');
+    console.error(err);
+  }
+}
+
+// ── Sync status indicator ───────────────────────────────────
+function setSyncStatus(state) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const map = {
+    synced:      { text: '● Synced',       cls: 'sync-ok'   },
+    connecting:  { text: '◌ Connecting…',  cls: 'sync-wait' },
+    offline:     { text: '○ Offline',      cls: 'sync-off'  },
+    local:       { text: '◎ Local mode',   cls: 'sync-local'},
+  };
+  const s = map[state] || map.local;
+  el.textContent  = s.text;
+  el.className    = 'sync-status ' + s.cls;
+}
+
+function updateSyncLabel() {
+  const el = document.getElementById('settings-sync-label');
+  if (el) el.textContent = 'Last synced ' + new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+// ───────────────────────────────────────────────────────────
+// TASK PERSISTENCE — write to Firestore OR localStorage
+// ───────────────────────────────────────────────────────────
+function saveTasks() {
+  // Used for local mode only (bulk save during seeding / clear-all)
+  if (!currentUser) {
+    localStorage.setItem('tsm-tasks', JSON.stringify(tasks));
+  }
+}
+
+async function saveTaskDoc(task) {
+  if (currentUser && fbDb) {
+    try {
+      await fbDb.collection('users').doc(currentUser.uid).collection('tasks').doc(task.id).set(task);
+    } catch (err) {
+      showToast('Save failed — check connection');
+      console.error(err);
+    }
+  } else {
+    // Upsert into local array and persist
+    const idx = tasks.findIndex(t => t.id === task.id);
+    if (idx !== -1) tasks[idx] = task; else tasks.unshift(task);
+    saveTasks();
+  }
+}
+
+async function deleteTaskDoc(id) {
+  if (currentUser && fbDb) {
+    try {
+      await fbDb.collection('users').doc(currentUser.uid).collection('tasks').doc(id).delete();
+    } catch (err) {
+      showToast('Delete failed — check connection');
+      console.error(err);
+    }
+  } else {
+    tasks = tasks.filter(t => t.id !== id);
+    saveTasks();
+    refreshCurrentView();
+  }
+}
+
+// ───────────────────────────────────────────────────────────
 // NOTIFICATIONS
 // ───────────────────────────────────────────────────────────
-const notifTimers = {}; // key → setTimeout ID
+const notifTimers = {};
 
 async function initNotifications() {
   if (!('Notification' in window)) {
@@ -72,22 +326,22 @@ async function initNotifications() {
     showToast('Notifications enabled ✓');
     scheduleAllNotifications();
   } else {
-    showToast(perm === 'denied' ? 'Notifications blocked — check browser settings' : 'Notification permission dismissed');
+    showToast(perm === 'denied'
+      ? 'Notifications blocked — check browser settings'
+      : 'Notification permission dismissed');
   }
   updateNotifUI();
 }
 
 function updateNotifUI() {
-  const btn = document.getElementById('notif-btn');
+  const btn     = document.getElementById('notif-btn');
   const granted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
   if (btn) {
     btn.style.color = granted ? '#D4860A' : '';
     btn.title       = granted ? 'Notifications enabled' : 'Enable notifications';
   }
-  // Update status bar if reminders view is active
   const bar = document.getElementById('notif-status-bar');
   if (bar) renderNotifStatusBar(bar);
-  // Update enable button
   const enableBtn = document.getElementById('notif-enable-btn');
   if (enableBtn) enableBtn.style.display = granted ? 'none' : '';
 }
@@ -101,64 +355,47 @@ function renderNotifStatusBar(bar) {
   if (perm === 'granted') {
     bar.innerHTML = '<div class="notif-status notif-granted">🔔 Notifications are enabled. Reminders will fire at your chosen offset before each task.</div>';
   } else if (perm === 'denied') {
-    bar.innerHTML = '<div class="notif-status notif-denied">🔕 Notifications are blocked by your browser. To enable them, click the lock icon in the address bar and allow notifications for this site.</div>';
+    bar.innerHTML = '<div class="notif-status notif-denied">🔕 Notifications are blocked by your browser. Click the lock icon in the address bar and allow notifications for this site.</div>';
   } else {
     bar.innerHTML = '<div class="notif-status notif-prompt">🔔 Click "Enable Notifications" above to receive task reminders.</div>';
   }
 }
 
-// Schedule (or reschedule) ALL task reminders from scratch
 function scheduleAllNotifications() {
-  // Clear every existing timer
   Object.values(notifTimers).forEach(clearTimeout);
   Object.keys(notifTimers).forEach(k => delete notifTimers[k]);
-
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-
   tasks.forEach(t => scheduleTaskNotifications(t));
-
   if (settings.dailyDigest) scheduleDailyDigest();
 }
 
-// Schedule the reminder(s) for a single task
 function scheduleTaskNotifications(task) {
   if (task.status === 'done') return;
   if (!task.date || !task.time) return;
   if (!task.reminder || task.reminder === 'none') return;
 
-  const taskMs = new Date(`${task.date}T${task.time}:00`).getTime();
+  const taskMs    = new Date(`${task.date}T${task.time}:00`).getTime();
   if (isNaN(taskMs)) return;
 
-  const now       = Date.now();
+  const now2      = Date.now();
   const offsetMin = parseInt(task.reminder, 10);
   const remindMs  = taskMs - offsetMin * 60_000;
 
-  // ── Chosen offset reminder ──────────────────────────────
-  if (remindMs > now) {
-    const label = offsetMin === 0
-      ? 'Due Right Now!'
-      : `${fmtOffset(offsetMin)} before`;
-
+  if (remindMs > now2) {
+    const label = offsetMin === 0 ? 'Due Right Now!' : `${fmtOffset(offsetMin)} before`;
     notifTimers[`${task.id}_r`] = setTimeout(() => {
       fireNotification(
         `⏰ Reminder — ${label}`,
         `"${task.name}"${task.time ? ' at ' + fmtTime(task.time) : ''}`,
-        task.priority,
-        task.id
+        task.priority, task.id
       );
-    }, remindMs - now);
+    }, remindMs - now2);
   }
 
-  // ── At-time notification (only if offset reminder > 0) ──
-  if (offsetMin > 0 && taskMs > now) {
+  if (offsetMin > 0 && taskMs > now2) {
     notifTimers[`${task.id}_0`] = setTimeout(() => {
-      fireNotification(
-        `▣ Task Due Now`,
-        `"${task.name}" — ${task.category}`,
-        task.priority,
-        task.id
-      );
-    }, taskMs - now);
+      fireNotification(`▣ Task Due Now`, `"${task.name}" — ${task.category}`, task.priority, task.id);
+    }, taskMs - now2);
   }
 }
 
@@ -171,15 +408,15 @@ function fmtOffset(min) {
 
 function fireNotification(title, body, priority = 'medium', taskId = '') {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-  const icons  = { high: '🔴', medium: '🟡', low: '🟢' };
+  const icons = { high: '🔴', medium: '🟡', low: '🟢' };
   const fullTitle = `${icons[priority] || '▣'} ${title}`;
   const options = {
     body,
-    icon:              './favicon75.png',
-    badge:             './favicon38.png',
-    tag:               `tsm-${taskId || Date.now()}`,
+    icon:               './favicon150-2.png',
+    badge:              './favicon100-2.png',
+    tag:                `tsm-${taskId || Date.now()}`,
     requireInteraction: priority === 'high',
-    silent:            false,
+    silent:             false,
   };
 
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -194,10 +431,10 @@ function fireNotification(title, body, priority = 'medium', taskId = '') {
 function scheduleDailyDigest() {
   clearTimeout(notifTimers['_digest']);
   const [h, m] = (settings.digestTime || '08:00').split(':').map(Number);
-  const now = new Date();
-  const next = new Date(now);
+  const now2 = new Date();
+  const next = new Date(now2);
   next.setHours(h, m, 0, 0);
-  if (next <= now) next.setDate(next.getDate() + 1);
+  if (next <= now2) next.setDate(next.getDate() + 1);
 
   notifTimers['_digest'] = setTimeout(() => {
     const todayStr    = new Date().toISOString().split('T')[0];
@@ -211,8 +448,8 @@ function scheduleDailyDigest() {
         'medium'
       );
     }
-    scheduleDailyDigest(); // reschedule for tomorrow
-  }, next - now);
+    scheduleDailyDigest();
+  }, next - now2);
 }
 
 function refreshNotifications() {
@@ -225,8 +462,6 @@ function refreshNotifications() {
 // HELPERS
 // ───────────────────────────────────────────────────────────
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-
-function saveTasks() { localStorage.setItem('tsm-tasks', JSON.stringify(tasks)); }
 
 function fmtDate(str) {
   if (!str) return '';
@@ -260,16 +495,14 @@ function showToast(msg) {
 
 function escHtml(str) {
   return (str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function reminderLabel(val) {
   const map = {
     none: 'No reminder', '0': 'At task time',
-    '5': '5 min before', '15': '15 min before',
+    '5': '5 min before',  '15': '15 min before',
     '30': '30 min before', '60': '1 hour before',
     '120': '2 hours before', '1440': '1 day before',
     '2880': '2 days before',
@@ -281,11 +514,9 @@ function fmtDuration(ms) {
   const totalMin = Math.floor(ms / 60_000);
   if (totalMin < 1)    return 'less than a minute';
   if (totalMin < 60)   return `${totalMin}m`;
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
   if (h < 24)  return m ? `${h}h ${m}m` : `${h}h`;
-  const d = Math.floor(h / 24);
-  const rh = h % 24;
+  const d = Math.floor(h / 24), rh = h % 24;
   return rh ? `${d}d ${rh}h` : `${d}d`;
 }
 
@@ -297,13 +528,11 @@ function switchView(view, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
   if (btn) btn.classList.add('active');
-
   if (view === 'dashboard') renderDashboard();
   if (view === 'tasks')     renderTasks();
   if (view === 'calendar')  renderCalendar();
   if (view === 'schedule')  renderSchedule();
   if (view === 'reminders') renderReminders();
-
   document.getElementById('sidebar').classList.remove('open');
 }
 
@@ -323,7 +552,6 @@ function renderDashboard() {
   document.getElementById('stat-progress').textContent = tasks.filter(t => t.status === 'progress').length;
   document.getElementById('stat-overdue').textContent  = tasks.filter(isOverdue).length;
 
-  // Upcoming: next 7 days, not done, sorted by date/time
   const upcoming = tasks
     .filter(t => t.status !== 'done' && t.date && t.date >= todayStr)
     .sort((a, b) => (a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1)
@@ -334,7 +562,6 @@ function renderDashboard() {
     ? upcoming.map(t => taskItemHTML(t)).join('')
     : '<li class="empty-msg">No upcoming tasks</li>';
 
-  // Today's schedule sorted by time
   const todayTasks = tasks
     .filter(t => t.date === todayStr)
     .sort((a, b) => (a.time || '99:99') < (b.time || '99:99') ? -1 : 1);
@@ -353,7 +580,6 @@ function renderDashboard() {
         </li>`).join('')
     : '<li class="empty-msg">Nothing scheduled today</li>';
 
-  // Progress bars by category
   const cats = ['work', 'personal', 'health', 'errands', 'other'];
   const colorMap = { work: 'accent', personal: 'accent', health: 'green', errands: 'amber', other: '' };
   document.getElementById('progress-bars').innerHTML = cats.map(cat => {
@@ -447,11 +673,11 @@ function renderCalendar() {
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('cal-month-label').textContent = `${months[calMonth]} ${calYear}`;
 
-  const grid     = document.getElementById('cal-grid');
-  const todayStr = new Date().toISOString().split('T')[0];
+  const grid        = document.getElementById('cal-grid');
+  const todayStr    = new Date().toISOString().split('T')[0];
   const firstDay    = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const dayHdrs = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dayHdrs     = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   let html = dayHdrs.map(d => `<div class="cal-day-header">${d}</div>`).join('');
   for (let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
@@ -469,7 +695,6 @@ function renderCalendar() {
         <div class="cal-dots">${dots}</div>
       </div>`;
   }
-
   grid.innerHTML = html;
 }
 
@@ -533,11 +758,9 @@ function renderSchedule() {
 // REMINDERS VIEW
 // ───────────────────────────────────────────────────────────
 function renderReminders() {
-  // Status bar
   const bar = document.getElementById('notif-status-bar');
   if (bar) renderNotifStatusBar(bar);
 
-  // Update enable button visibility
   const enableBtn = document.getElementById('notif-enable-btn');
   if (enableBtn) {
     const granted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
@@ -546,13 +769,8 @@ function renderReminders() {
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // ── Upcoming reminders: future tasks with a reminder set, not done ──
   const upcoming = tasks
-    .filter(t =>
-      t.status !== 'done' &&
-      t.reminder && t.reminder !== 'none' &&
-      t.date && t.date >= todayStr
-    )
+    .filter(t => t.status !== 'done' && t.reminder && t.reminder !== 'none' && t.date && t.date >= todayStr)
     .sort((a, b) => (a.date + (a.time || '')) < (b.date + (b.time || '')) ? -1 : 1);
 
   document.getElementById('reminder-count').textContent = upcoming.length;
@@ -560,21 +778,15 @@ function renderReminders() {
     ? upcoming.map(t => reminderItemHTML(t)).join('')
     : '<li class="empty-msg">No upcoming reminders scheduled</li>';
 
-  // ── Overdue: past due date, not done ──────────────────────
-  const overdue = tasks
-    .filter(isOverdue)
-    .sort((a, b) => a.date < b.date ? 1 : -1); // most recent overdue first
-
+  const overdue = tasks.filter(isOverdue).sort((a, b) => a.date < b.date ? 1 : -1);
   document.getElementById('overdue-reminder-count').textContent = overdue.length;
   document.getElementById('overdue-reminder-list').innerHTML = overdue.length
     ? overdue.map(t => reminderItemHTML(t, true)).join('')
     : '<li class="empty-msg">No overdue tasks — great work! 🎉</li>';
 
-  // ── All reminders: every task that has a reminder set ─────
   const all = tasks
     .filter(t => t.reminder && t.reminder !== 'none')
     .sort((a, b) => {
-      // Sort: overdue first, then upcoming, then done
       const aOver = isOverdue(a), bOver = isOverdue(b);
       const aDone = a.status === 'done', bDone = b.status === 'done';
       if (aOver !== bOver) return aOver ? -1 : 1;
@@ -588,28 +800,21 @@ function renderReminders() {
 }
 
 function reminderItemHTML(t, forceOverdue = false) {
-  const checked = t.status === 'done';
-  const over    = forceOverdue || isOverdue(t);
+  const checked  = t.status === 'done';
+  const over     = forceOverdue || isOverdue(t);
   const remLabel = reminderLabel(t.reminder);
-  const now      = Date.now();
+  const now2     = Date.now();
 
-  // Calculate when the reminder fires or a status description
   let fireLine = '';
   if (t.date && t.time && t.reminder && t.reminder !== 'none') {
     const taskMs    = new Date(`${t.date}T${t.time}:00`).getTime();
     const offsetMin = parseInt(t.reminder, 10);
     const remindMs  = taskMs - offsetMin * 60_000;
-
     if (!isNaN(taskMs)) {
-      if (checked) {
-        fireLine = 'completed';
-      } else if (remindMs > now) {
-        fireLine = `fires in ${fmtDuration(remindMs - now)}`;
-      } else if (taskMs > now) {
-        fireLine = 'reminder passed · task upcoming';
-      } else {
-        fireLine = 'past due';
-      }
+      if (checked)              fireLine = 'completed';
+      else if (remindMs > now2) fireLine = `fires in ${fmtDuration(remindMs - now2)}`;
+      else if (taskMs > now2)   fireLine = 'reminder passed · task upcoming';
+      else                      fireLine = 'past due';
     }
   } else if (!t.time && t.date && !checked) {
     fireLine = 'no time set — reminder won\'t fire';
@@ -630,8 +835,8 @@ function reminderItemHTML(t, forceOverdue = false) {
         <div class="reminder-chips">
           <span class="reminder-chip">🔔 ${remLabel}</span>
           ${fireLine ? `<span class="reminder-chip reminder-fire">${fireLine}</span>` : ''}
-          ${over    ? '<span class="overdue-badge">Overdue</span>' : ''}
-          ${checked ? '<span class="done-badge">Done</span>' : ''}
+          ${over     ? '<span class="overdue-badge">Overdue</span>' : ''}
+          ${checked  ? '<span class="done-badge">Done</span>' : ''}
         </div>
       </div>
       <div class="task-actions">
@@ -678,7 +883,7 @@ function openEditTask(id) {
   setTimeout(() => document.getElementById('task-name').focus(), 50);
 }
 
-function saveTask() {
+async function saveTask() {
   const name = document.getElementById('task-name').value.trim();
   if (!name) {
     document.getElementById('task-name').classList.add('input-error');
@@ -700,27 +905,28 @@ function saveTask() {
     reminder: document.getElementById('task-reminder').value,
   };
 
+  // Cancel old timers for this task
   if (editingId) {
-    // Cancel old timers for this task before re-scheduling
     clearTimeout(notifTimers[`${editingId}_r`]);
     clearTimeout(notifTimers[`${editingId}_0`]);
     delete notifTimers[`${editingId}_r`];
     delete notifTimers[`${editingId}_0`];
-    const idx = tasks.findIndex(t => t.id === editingId);
-    if (idx !== -1) tasks[idx] = task;
-    showToast('Task updated ✓');
-  } else {
-    tasks.unshift(task);
-    showToast('Task added ✓');
   }
 
-  saveTasks();
-  // Schedule just this task's notifications (more efficient than full reschedule)
+  // Write to Firestore or local
+  await saveTaskDoc(task);
+
+  // For local mode, update in-memory array immediately (Firestore uses snapshot)
+  if (!currentUser) {
+    refreshCurrentView();
+  }
+
+  showToast(editingId ? 'Task updated ✓' : 'Task added ✓');
+
   if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
     scheduleTaskNotifications(task);
   }
   closeModal();
-  refreshCurrentView();
 }
 
 function closeModal(e) {
@@ -732,23 +938,25 @@ function closeModal(e) {
 // SETTINGS MODAL
 // ───────────────────────────────────────────────────────────
 function openSettings() {
-  document.getElementById('settings-name').value            = settings.userName;
+  document.getElementById('settings-name').value             = settings.userName;
   document.getElementById('settings-default-reminder').value = settings.defaultReminder;
-  document.getElementById('settings-daily-digest').checked  = settings.dailyDigest;
-  document.getElementById('settings-digest-time').value     = settings.digestTime;
+  document.getElementById('settings-daily-digest').checked   = settings.dailyDigest;
+  document.getElementById('settings-digest-time').value      = settings.digestTime;
 
-  // Show current notification permission status
   const permEl = document.getElementById('settings-notif-perm');
   if (permEl) {
     if (!('Notification' in window)) {
       permEl.textContent = 'Not supported';
-      permEl.className = 'perm-badge perm-denied';
+      permEl.className   = 'perm-badge perm-denied';
     } else {
       const p = Notification.permission;
       permEl.textContent = p === 'granted' ? 'Enabled ✓' : p === 'denied' ? 'Blocked ✕' : 'Not yet enabled';
-      permEl.className = `perm-badge perm-${p}`;
+      permEl.className   = `perm-badge perm-${p}`;
     }
   }
+
+  // Refresh auth state in settings panel
+  updateAuthUI(currentUser);
 
   document.getElementById('settings-overlay').classList.add('open');
 }
@@ -765,12 +973,15 @@ function saveSettingsUI() {
   settings.digestTime      = document.getElementById('settings-digest-time').value || '08:00';
 
   saveSettings();
-  applySettings();
+  if (!currentUser) applySettings();
   refreshNotifications();
   document.getElementById('settings-overlay').classList.remove('open');
   showToast('Settings saved ✓');
 }
 
+// ───────────────────────────────────────────────────────────
+// DATA ACTIONS
+// ───────────────────────────────────────────────────────────
 function exportTasks() {
   const blob = new Blob([JSON.stringify(tasks, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -785,54 +996,75 @@ function exportTasks() {
   showToast('Tasks exported ✓');
 }
 
-function clearAllTasksConfirm() {
+async function clearAllTasksConfirm() {
   if (!confirm('Delete ALL tasks? This cannot be undone.')) return;
-  // Clear all timers
+
   Object.values(notifTimers).forEach(clearTimeout);
   Object.keys(notifTimers).forEach(k => delete notifTimers[k]);
-  tasks = [];
-  saveTasks();
-  if (settings.dailyDigest && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-    scheduleDailyDigest();
+
+  if (currentUser && fbDb) {
+    try {
+      const snap = await fbDb.collection('users').doc(currentUser.uid).collection('tasks').get();
+      const batch = fbDb.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    } catch (err) {
+      showToast('Delete failed — check connection');
+      return;
+    }
+  } else {
+    tasks = [];
+    saveTasks();
+    if (settings.dailyDigest && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      scheduleDailyDigest();
+    }
+    refreshCurrentView();
   }
+
   document.getElementById('settings-overlay').classList.remove('open');
-  refreshCurrentView();
   showToast('All tasks deleted');
 }
 
 // ───────────────────────────────────────────────────────────
 // TASK ACTIONS
 // ───────────────────────────────────────────────────────────
-function toggleDone(id) {
+async function toggleDone(id) {
   const t = tasks.find(x => x.id === id);
   if (!t) return;
-  t.status = t.status === 'done' ? 'todo' : 'done';
-  saveTasks();
-  // If marking done, cancel its pending timers
-  if (t.status === 'done') {
+  const newStatus = t.status === 'done' ? 'todo' : 'done';
+
+  if (currentUser && fbDb) {
+    try {
+      await fbDb.collection('users').doc(currentUser.uid).collection('tasks').doc(id).update({ status: newStatus });
+    } catch (err) {
+      showToast('Update failed');
+      return;
+    }
+  } else {
+    t.status = newStatus;
+    saveTasks();
+    refreshCurrentView();
+  }
+
+  if (newStatus === 'done') {
     clearTimeout(notifTimers[`${id}_r`]);
     clearTimeout(notifTimers[`${id}_0`]);
     delete notifTimers[`${id}_r`];
     delete notifTimers[`${id}_0`];
-  } else {
-    // Re-enable timers if un-done
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      scheduleTaskNotifications(t);
-    }
+  } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    scheduleTaskNotifications({ ...t, status: newStatus });
   }
-  refreshCurrentView();
-  showToast(t.status === 'done' ? 'Marked complete ✓' : 'Marked incomplete');
+
+  showToast(newStatus === 'done' ? 'Marked complete ✓' : 'Marked incomplete');
 }
 
-function deleteTask(id) {
+async function deleteTask(id) {
   if (!confirm('Delete this task?')) return;
   clearTimeout(notifTimers[`${id}_r`]);
   clearTimeout(notifTimers[`${id}_0`]);
   delete notifTimers[`${id}_r`];
   delete notifTimers[`${id}_0`];
-  tasks = tasks.filter(t => t.id !== id);
-  saveTasks();
-  refreshCurrentView();
+  await deleteTaskDoc(id);
   showToast('Task deleted');
 }
 
@@ -867,20 +1099,48 @@ document.addEventListener('keydown', e => {
 });
 
 // ───────────────────────────────────────────────────────────
+// URL PARAM ACTIONS  (e.g., ?action=new-task, ?view=schedule)
+// ───────────────────────────────────────────────────────────
+function handleUrlParams() {
+  const p = new URLSearchParams(location.search);
+  const view   = p.get('view');
+  const action = p.get('action');
+
+  if (view) {
+    const btn = document.querySelector(`[data-view="${view}"]`);
+    switchView(view, btn);
+  }
+  if (action === 'new-task') {
+    setTimeout(openAddTask, 300);
+  }
+}
+
+// ───────────────────────────────────────────────────────────
 // INIT
 // ───────────────────────────────────────────────────────────
 applySettings();
-renderDashboard();
 updateNotifUI();
+handleUrlParams();
 
-// Re-enable timers if permission was already granted from a previous session
+// If Firebase is NOT available, boot with localStorage immediately
+if (!fbAuth) {
+  tasks = getLocalTasks();
+  if (tasks.length === 0) seedSampleData();
+  renderDashboard();
+  setSyncStatus('local');
+} else {
+  // Firebase is available — onAuthStateChanged will drive everything.
+  // Show initial dashboard skeleton while waiting for auth check.
+  renderDashboard();
+  setSyncStatus('connecting');
+}
+
+// Re-enable notification timers if permission already granted
 if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
   scheduleAllNotifications();
 }
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./service-worker.js').catch(() => {
-    // Fails gracefully in file:// protocol — that's fine
-  });
+  navigator.serviceWorker.register('./service-worker.js').catch(() => {});
 }
