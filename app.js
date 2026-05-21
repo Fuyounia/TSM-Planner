@@ -10,19 +10,57 @@ let fbAuth = null;
 let fbDb   = null;
 let currentUser = null;
 let firestoreUnsub = null; // unsubscribe fn for onSnapshot
+let fbMessaging = null;
 
 (function initFirebase() {
   if (typeof firebase === 'undefined' || typeof firebaseConfig === 'undefined') return;
+
   try {
     firebase.initializeApp(firebaseConfig);
+
     fbAuth = firebase.auth();
     fbDb   = firebase.firestore();
+
+    // 🔥 ADD FIREBASE MESSAGING
+    if (firebase.messaging && VAPID_PUBLIC_KEY) {
+      fbMessaging = firebase.messaging();
+
+      fbMessaging.getToken({ vapidKey: VAPID_PUBLIC_KEY })
+        .then(token => {
+          console.log("FCM Token:", token);
+          // (optional) save token to Firestore later
+        })
+        .catch(err => {
+          console.warn("Messaging token error:", err);
+        });
+    }
+
     fbDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
     fbAuth.onAuthStateChanged(handleAuthStateChange);
+
   } catch (e) {
     console.warn('Firebase init failed:', e);
   }
 })();
+
+// 🔔 Handle incoming FCM messages (foreground)
+if (firebase.messaging && fbMessaging) {
+  fbMessaging.onMessage(payload => {
+    console.log("Push received:", payload);
+
+    const title = payload.notification?.title || "Task Reminder";
+    const body  = payload.notification?.body || "";
+
+    showToast(title);
+
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      new Notification(title, {
+        body,
+        icon: "./favicon150-2.png",
+      });
+    }
+  });
+}
 
 // ───────────────────────────────────────────────────────────
 // SETTINGS STATE

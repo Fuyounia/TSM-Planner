@@ -25,7 +25,7 @@ const firebaseConfig = {
 
 // Web Push VAPID public key
 // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates → Key pair
-const VAPID_KEY = "OSklSvFNGLyBBYMtZ2jkUeOts-7-hwgv7efEuBdctIw";
+const VAPID_KEY = "BKQYZa3PNwp6DejJlM6-tRz78yWi43LQkCFA-VAtNau97FBJP0zNVVttG9uomQqZ8o6D3MdU6k5ew4LjOuROU-g";
 
 /* ── Firestore Security Rules (paste into Firebase Console) ──
 
